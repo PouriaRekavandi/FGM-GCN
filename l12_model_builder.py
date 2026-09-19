@@ -222,7 +222,7 @@ def build_part(pname, dim):
         if nid not in src['nodes']:
             raise ValueError("Element references missing node %s in part '%s'." %
                              (nid, pname))
-        nodes.append(src['nodes'][nid])
+        nodes.append((nid,) + src['nodes'][nid])
     conn_by_type = {}
     labels_by_type = {}
     for eid, t, c in elems:
@@ -275,6 +275,44 @@ if PROGRESSIVE_DAMAGE:
     ge.hashinDamageInitiation.DamageStabilization(
         fiberTensileCoeff=5e-05, fiberCompressiveCoeff=5e-05,
         matrixTensileCoeff=5e-05, matrixCompressiveCoeff=5e-05)
+
+# =========================== MODEL VALIDATION ================================
+def require_part(name):
+    if name not in deck.parts:
+        raise ValueError("Required part '%s' is missing from %s" % (name, MESH_FILE))
+
+def require_instance(name):
+    if name not in deck.instances:
+        raise ValueError("Required instance '%s' is missing from %s" % (name, MESH_FILE))
+
+def require_part_set(part_name, set_name):
+    p = m.parts[part_name]
+    if set_name not in p.sets.keys():
+        raise ValueError("Required part element set '%s' is missing on '%s'." %
+                         (set_name, part_name))
+
+def require_assembly_set(name):
+    if name not in a.sets.keys():
+        raise ValueError("Required assembly set '%s' was not created." % name)
+
+def check_required_mesh_content():
+    for pn in ('HINGE_LEAF_A', 'HINGE_LEAF_B', 'Pin', 'WING_POINTS'):
+        require_part(pn)
+    for ins in ('HINGE_LEAF_A-1', 'HINGE_LEAF_B-1',
+                'Pin-1', 'WING_POINTS-1', 'WING_POINTS-2'):
+        require_instance(ins)
+
+    wp_sets = set(m.parts['WING_POINTS'].sets.keys())
+    for _, eset in LAYUPS.values():
+        if eset not in wp_sets:
+            raise ValueError("Wing layup set '%s' is missing." % eset)
+
+    if 46521 not in deck.parts['WING_POINTS']['nodes']:
+        raise ValueError("WING_POINTS reference node 46521 is missing.")
+
+    print('Model-content validation: OK')
+
+
 
 # ==================== SECTION 4 - SECTIONS AND COMPOSITE LAYUPS ==============
 m.HomogeneousSolidSection(name='SEC-HINGE-AL1100', material='AL-1100-H14', thickness=None)
@@ -369,43 +407,6 @@ for pn, sec in (('HINGE_LEAF_A', 'SEC-HINGE-AL1100'),
     reg = regionToolset.Region(elements=p.elements)
     p.SectionAssignment(region=reg, sectionName=sec, offset=0.0,
                         offsetType=MIDDLE_SURFACE, offsetField='')
-
-
-# =========================== MODEL VALIDATION ================================
-def require_part(name):
-    if name not in deck.parts:
-        raise ValueError("Required part '%s' is missing from %s" % (name, MESH_FILE))
-
-def require_instance(name):
-    if name not in deck.instances:
-        raise ValueError("Required instance '%s' is missing from %s" % (name, MESH_FILE))
-
-def require_part_set(part_name, set_name):
-    p = m.parts[part_name]
-    if set_name not in p.sets.keys():
-        raise ValueError("Required part element set '%s' is missing on '%s'." %
-                         (set_name, part_name))
-
-def require_assembly_set(name):
-    if name not in a.sets.keys():
-        raise ValueError("Required assembly set '%s' was not created." % name)
-
-def check_required_mesh_content():
-    for pn in ('HINGE_LEAF_A', 'HINGE_LEAF_B', 'Pin', 'WING_POINTS'):
-        require_part(pn)
-    for ins in ('HINGE_LEAF_A-1', 'HINGE_LEAF_B-1',
-                'Pin-1', 'WING_POINTS-1', 'WING_POINTS-2'):
-        require_instance(ins)
-
-    wp_sets = set(m.parts['WING_POINTS'].sets.keys())
-    for _, eset in LAYUPS.values():
-        if eset not in wp_sets:
-            raise ValueError("Wing layup set '%s' is missing." % eset)
-
-    if 46521 not in deck.parts['WING_POINTS']['nodes']:
-        raise ValueError("WING_POINTS reference node 46521 is missing.")
-
-    print('Model-content validation: OK')
 
 
 # ========================= SECTION 5 - ASSEMBLY ==============================
