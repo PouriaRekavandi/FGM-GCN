@@ -231,9 +231,7 @@ def build_part(pname, dim):
     p = m.PartFromNodesAndElements(
         name=pname, dimensionality=dim, type=DEFORMABLE_BODY,
         nodes=nodes,
-        elements=[tuple(conn_by_type[t]) for t in sorted(conn_by_type)],
-        elementTypes=[ETYPE[t] for t in sorted(conn_by_type)],
-        nodeLabels=tuple(sorted(keep)))
+        elements=[tuple(conn_by_type[t]) for t in sorted(conn_by_type)])
     # element sets defined inside the part (composite layup regions, sections)
     for sname, ids in src['elsets'].items():
         try:
