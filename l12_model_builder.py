@@ -233,7 +233,7 @@ def build_part(pname, dim):
         nodes=nodes,
         elements=[tuple(conn_by_type[t]) for t in sorted(conn_by_type)],
         elementTypes=[ETYPE[t] for t in sorted(conn_by_type)],
-        nodeLabels=tuple(sorted(keep)), elementLabels=[tuple(labels_by_type[t]) for t in sorted(conn_by_type)])
+        nodeLabels=tuple(sorted(keep)))
     # element sets defined inside the part (composite layup regions, sections)
     for sname, ids in src['elsets'].items():
         try:
