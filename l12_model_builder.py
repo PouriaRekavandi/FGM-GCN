@@ -96,7 +96,7 @@ class Deck(object):
                 o = self._opts(ln)
                 mode = None; pend = []
                 if kw == 'PART':
-                    part = o['name']; self.parts[part] = {'nodes': {}, 'elems': {}, 'elsets': {}}
+                    part = o['name']; self.parts[part] = {'nodes': {}, 'elems': {}, 'elsets': {}, 'nsets': {}}
                 elif kw == 'END PART':
                     part = None
                 elif kw == 'INSTANCE':
