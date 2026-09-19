@@ -120,7 +120,11 @@ class Deck(object):
                 elif kw == 'NSET':
                     mode = 'nset'
                     ctx = (o['nset'], o.get('instance'), 'generate' in o)
-                    self.nsets.setdefault(o['nset'], {'inst': o.get('instance'), 'ids': []})
+                    tgt = self.parts[part]['nsets'] if part else self.nsets
+                    if part:
+                        tgt.setdefault(o['nset'], [])
+                    else:
+                        tgt.setdefault(o['nset'], {'inst': o.get('instance'), 'ids': []})
                 elif kw == 'ELSET':
                     mode = 'elset'
                     ctx = (o['elset'], o.get('instance'), 'generate' in o)
@@ -159,7 +163,10 @@ class Deck(object):
                 else:
                     ids = [int(v) for v in vals if v.lstrip('-').isdigit()]
                 if mode == 'nset':
-                    self.nsets[name]['ids'].extend(ids)
+                    if part:
+                        self.parts[part]['nsets'][name].extend(ids)
+                    else:
+                        self.nsets[name]['ids'].extend(ids)
                 elif part:
                     self.parts[part]['elsets'][name].extend(ids)
                 else:
@@ -218,11 +225,11 @@ def build_part(pname, dim):
             keep.update(c)
             elems.append((eid, tgt if FIRST_ORDER else etype, c))
     for nid in sorted(keep):
-        nmap[nid] = len(nodes)
+        nmap[nid] = len(nodes) + 1  # 1-based indexing for PartFromNodesAndElements
         if nid not in src['nodes']:
             raise ValueError("Element references missing node %s in part '%s'." %
                              (nid, pname))
-        nodes.append((nid,) + src['nodes'][nid])
+        nodes.append(tuple(src['nodes'][nid]))
     conn_by_type = {}
     labels_by_type = {}
     for eid, t, c in elems:
@@ -232,11 +239,35 @@ def build_part(pname, dim):
         name=pname, dimensionality=dim, type=DEFORMABLE_BODY,
         nodes=nodes,
         elements=[tuple(conn_by_type[t]) for t in sorted(conn_by_type)])
-    # element sets defined inside the part (composite layup regions, sections)
-    for sname, ids in src['elsets'].items():
+
+    seq_nodes = p.nodes
+    seq_elems = p.elements
+
+    sorted_keep = sorted(keep)
+    orig_node_id_to_seq_idx = {nid: i for i, nid in enumerate(sorted_keep)}
+
+    orig_elem_id_to_seq_idx = {}
+    curr_idx = 0
+    for t in sorted(conn_by_type):
+        for eid in labels_by_type[t]:
+            orig_elem_id_to_seq_idx[eid] = curr_idx
+            curr_idx += 1
+
+    for sname, ids in src.get('elsets', {}).items():
         try:
-            p.SetFromElementLabels(name=sname,
-                                   elementLabels=tuple(sorted(set(ids))))
+            idxs = [orig_elem_id_to_seq_idx[eid] for eid in ids if eid in orig_elem_id_to_seq_idx]
+            if idxs:
+                elem_seq = tuple(seq_elems[i:i+1][0] for i in idxs)
+                p.Set(name=sname, elements=elem_seq)
+        except Exception:
+            pass
+
+    for sname, ids in src.get('nsets', {}).items():
+        try:
+            idxs = [orig_node_id_to_seq_idx[nid] for nid in ids if nid in orig_node_id_to_seq_idx]
+            if idxs:
+                node_seq = tuple(seq_nodes[i:i+1][0] for i in idxs)
+                p.Set(name=sname, nodes=node_seq)
         except Exception:
             pass
     print('   part %-14s built (%d nodes, %d elements)' % (pname, len(nodes), len(elems)))
